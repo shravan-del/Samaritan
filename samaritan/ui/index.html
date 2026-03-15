@@ -1,0 +1,2398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAMARITAN</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan:    #00d4ff;
+      --cyan-dim: rgba(0,212,255,0.15);
+      --cyan-glow: rgba(0,212,255,0.25);
+      --purple:  #7c3aed;
+      --purple-dim: rgba(124,58,237,0.15);
+      --purple-glow: rgba(124,58,237,0.3);
+      --coral:   #ff6b6b;
+      --coral-dim: rgba(255,107,107,0.15);
+      --coral-glow: rgba(255,107,107,0.3);
+      --amber:   #f59e0b;
+      --amber-dim: rgba(245,158,11,0.15);
+      --white:   #e8eaf0;
+      --dim:     rgba(232,234,240,0.35);
+      --dimmer:  rgba(232,234,240,0.15);
+      --bg:      #07071a;
+      --bg2:     #0d0d2b;
+      --bg3:     #111133;
+      --border:  rgba(124,58,237,0.18);
+      --border-bright: rgba(0,212,255,0.25);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--white);
+      font-family: 'Inter', system-ui, sans-serif;
+      overflow: hidden;
+      user-select: none;
+      cursor: default;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── ANIMATED BACKGROUND MESH ───────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 80% 60% at 10% 20%, rgba(124,58,237,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 90% 80%, rgba(0,212,255,0.1) 0%, transparent 55%),
+        radial-gradient(ellipse 50% 40% at 50% 50%, rgba(124,58,237,0.06) 0%, transparent 70%);
+      animation: mesh-shift 18s ease-in-out infinite alternate;
+    }
+    @keyframes mesh-shift {
+      0%   { background-position: 0% 0%, 100% 100%, 50% 50%; }
+      50%  { background-position: 30% 20%, 70% 60%, 60% 40%; }
+      100% { background-position: 10% 40%, 90% 30%, 45% 55%; }
+    }
+
+    /* ── CSS GRID OVERLAY ────────────────────────── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(124,58,237,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(124,58,237,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    /* ═══════════════════════════════════════════════
+       PHASE 1 — Entry Portal
+    ═══════════════════════════════════════════════ */
+
+    #phase1 {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      transition: opacity 0.6s ease, transform 0.6s ease;
+      z-index: 10;
+    }
+    #phase1.exiting {
+      opacity: 0;
+      transform: scale(1.04);
+      pointer-events: none;
+    }
+
+    /* ── TOP STATUS BAR ─────────────────────────── */
+    #topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      z-index: 100;
+      background: rgba(7,7,26,0.7);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    #status-label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 3px;
+      color: var(--dimmer);
+      transition: color 0.2s;
+      text-transform: uppercase;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    #status-label.listening { color: var(--cyan); text-shadow: 0 0 8px var(--cyan-glow); }
+    #status-label.speaking  { color: var(--cyan); }
+    #status-label.blocked   { color: var(--coral); text-shadow: 0 0 8px var(--coral-glow); }
+    #status-label.confirm   { color: var(--amber); }
+    #status-label.typing    { color: var(--dimmer); }
+    #status-label.wake      { color: var(--cyan); animation: label-flash 0.6s ease; }
+
+    @keyframes label-flash {
+      0%   { opacity: 0; }
+      60%  { opacity: 1; }
+      100% { opacity: 1; }
+    }
+
+    #topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    #hist-toggle, #mic-toggle {
+      background: transparent;
+      border: none;
+      color: var(--dimmer);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 0;
+      transition: color 0.2s;
+    }
+    #hist-toggle:hover { color: var(--dim); }
+    #mic-toggle { color: var(--dimmer); }
+    #mic-toggle.active { color: var(--cyan); animation: mic-pulse 1s ease-in-out infinite alternate; text-shadow: 0 0 8px var(--cyan-glow); }
+
+    @keyframes mic-pulse {
+      from { color: rgba(0,212,255,0.5); }
+      to   { color: var(--cyan); }
+    }
+
+    #role-select {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--dimmer);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      font-family: 'JetBrains Mono', monospace;
+      cursor: pointer;
+      -webkit-appearance: none;
+      transition: color 0.2s;
+    }
+    #role-select:hover { color: var(--dim); }
+    #role-select option { background: #0d0d2b; color: #aaa; }
+
+    /* ── MAIN STAGE ─────────────────────────────── */
+    #stage {
+      flex: 1;
+      position: relative;
+      margin-top: 40px;
+    }
+
+    #anchor {
+      position: absolute;
+      left: 50%;
+      bottom: 48%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── TRANSCRIPT BUBBLE ───────────────────────── */
+    #transcript-bubble {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 1px;
+      color: var(--dimmer);
+      text-align: center;
+      margin-bottom: 8px;
+      min-height: 0;
+      font-style: italic;
+      transition: color 0.2s;
+    }
+    #transcript-bubble.active { color: var(--cyan); }
+
+    /* ── RESPONSE TEXT ──────────────────────────── */
+    #response-text {
+      font-size: 18px;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+      line-height: 1.7;
+      color: var(--white);
+      text-align: center;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-width: min(700px, 80vw);
+      margin-bottom: 10px;
+      transition: color 0.2s;
+      min-height: 0;
+    }
+    #response-text.blocked { color: var(--coral); }
+    #response-text.confirm { color: var(--amber); }
+
+    #resp-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 18px;
+      background: var(--cyan);
+      margin-left: 4px;
+      vertical-align: middle;
+      opacity: 0;
+      border-radius: 1px;
+      box-shadow: 0 0 8px var(--cyan-glow);
+    }
+    #resp-cursor.active {
+      opacity: 1;
+      animation: blink 0.9s step-end infinite;
+    }
+
+    /* ── LINE ZONE ───────────────────────────────── */
+    #line-zone {
+      position: relative;
+      height: 1px;
+      width: 100vw;
+      max-width: 900px;
+      cursor: text;
+    }
+
+    #line-left, #line-right {
+      position: absolute;
+      top: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0,212,255,0.5));
+      width: 0;
+      transition: background 0.3s;
+      pointer-events: none;
+    }
+    #line-left  { right: 50%; background: linear-gradient(270deg, transparent, rgba(0,212,255,0.5)); }
+    #line-right { left: 50%; background: linear-gradient(90deg, transparent, rgba(0,212,255,0.5)); }
+
+    #line-left.speaking,  #line-right.speaking  { background: linear-gradient(90deg, transparent, rgba(0,212,255,0.8)); }
+    #line-left.blocked,   #line-right.blocked   { background: linear-gradient(90deg, transparent, rgba(255,107,107,0.8)); }
+    #line-left.confirm,   #line-right.confirm   { background: linear-gradient(90deg, transparent, rgba(245,158,11,0.8)); }
+    #line-left.typing,    #line-right.typing    { background: linear-gradient(90deg, transparent, rgba(0,212,255,0.5)); }
+    #line-left.listening, #line-right.listening { background: linear-gradient(90deg, transparent, rgba(0,212,255,0.7)); }
+
+    /* ── INLINE INPUT ────────────────────────────── */
+    #line-input-wrap {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(560px, 80vw);
+      display: flex;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+    }
+    #line-input-wrap.active { opacity: 1; pointer-events: auto; }
+
+    #line-input {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--white);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 15px;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+      text-align: center;
+      caret-color: var(--cyan);
+      user-select: text;
+      resize: none;
+      overflow: hidden;
+      width: 100%;
+      min-height: 24px;
+      line-height: 1.6;
+      scrollbar-width: none;
+    }
+    #line-input::-webkit-scrollbar { display: none; }
+
+    /* ── EXPANDED INPUT ──────────────────────────── */
+    #expand-wrap {
+      position: absolute;
+      left: 50%;
+      bottom: 20px;
+      transform: translateX(-50%);
+      width: min(580px, 82vw);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 10;
+    }
+    #expand-wrap.active { opacity: 1; pointer-events: auto; }
+
+    #expand-input {
+      width: 100%;
+      background: rgba(13,13,43,0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-bright);
+      border-radius: 8px;
+      color: var(--white);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 14px;
+      font-weight: 300;
+      letter-spacing: 0.2px;
+      padding: 16px 20px;
+      outline: none;
+      resize: none;
+      min-height: 90px;
+      max-height: 220px;
+      caret-color: var(--cyan);
+      user-select: text;
+      line-height: 1.6;
+      box-shadow: 0 0 30px rgba(0,212,255,0.08), inset 0 1px 0 rgba(255,255,255,0.04);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    #expand-input:focus {
+      border-color: rgba(0,212,255,0.5);
+      box-shadow: 0 0 30px rgba(0,212,255,0.15), 0 0 0 1px rgba(0,212,255,0.1);
+    }
+
+    #expand-hint {
+      margin-top: 6px;
+      font-size: 9px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 2px;
+      color: var(--dimmer);
+      text-align: right;
+    }
+
+    /* ── THINKING DOTS ───────────────────────────── */
+    #thinking-dots {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    #thinking-dots.active { display: flex; }
+    #thinking-dots span {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--cyan-dim);
+      border: 1px solid var(--cyan);
+      animation: dot-pulse 1.2s ease-in-out infinite;
+    }
+    #thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+    #thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dot-pulse {
+      0%, 80%, 100% { opacity: 0.2; transform: scale(0.85); }
+      40%            { opacity: 1;   transform: scale(1.2); box-shadow: 0 0 8px var(--cyan-glow); }
+    }
+
+    /* ── WAVEFORM ─────────────────────────────────── */
+    #waveform {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      margin-top: 12px;
+      height: 22px;
+    }
+    #waveform.active { display: flex; }
+    #waveform span {
+      display: block;
+      width: 3px; height: 4px;
+      background: var(--cyan);
+      border-radius: 2px;
+      box-shadow: 0 0 6px var(--cyan-glow);
+    }
+    #waveform.active span { animation: wave-bar 0.8s ease-in-out infinite alternate; }
+    #waveform.active span:nth-child(1) { animation-delay: 0.0s; }
+    #waveform.active span:nth-child(2) { animation-delay: 0.1s; }
+    #waveform.active span:nth-child(3) { animation-delay: 0.2s; }
+    #waveform.active span:nth-child(4) { animation-delay: 0.3s; }
+    #waveform.active span:nth-child(5) { animation-delay: 0.4s; }
+    #waveform.active span:nth-child(6) { animation-delay: 0.3s; }
+    #waveform.active span:nth-child(7) { animation-delay: 0.2s; }
+    @keyframes wave-bar {
+      from { height: 4px; }
+      to   { height: 20px; }
+    }
+
+    /* ── DIAMOND ────────────────────────────────── */
+    #diamond-wrap {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: text;
+      position: relative;
+    }
+
+    /* Glow ring behind main diamond */
+    #diamond-wrap::before {
+      content: '';
+      position: absolute;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,212,255,0.15) 0%, transparent 70%);
+      animation: diamond-glow-ring 3s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    @keyframes diamond-glow-ring {
+      from { opacity: 0.4; transform: scale(0.9); }
+      to   { opacity: 1;   transform: scale(1.1); }
+    }
+
+    #diamond {
+      width: 12px; height: 12px;
+      background: var(--white);
+      transform: rotate(45deg);
+      transition: background 0.2s, box-shadow 0.2s;
+      position: relative;
+      z-index: 1;
+    }
+    #diamond.idle      { background: rgba(232,234,240,0.7); box-shadow: 0 0 6px rgba(0,212,255,0.3); }
+    #diamond.typing    { background: var(--cyan); box-shadow: 0 0 12px var(--cyan-glow); }
+    #diamond.wake      { background: var(--cyan); animation: wake-expand 0.65s ease-out forwards; }
+    #diamond.listening { background: var(--cyan); box-shadow: 0 0 16px rgba(0,212,255,0.7); }
+    #diamond.speaking  { background: var(--cyan); animation: speaking-pulse 0.9s ease-in-out infinite alternate; }
+    #diamond.blocked   { background: var(--coral); box-shadow: 0 0 14px var(--coral-glow); }
+    #diamond.confirm   { background: var(--amber); box-shadow: 0 0 14px rgba(245,158,11,0.5); }
+
+    @keyframes speaking-pulse {
+      from { box-shadow: 0 0 6px rgba(0,212,255,0.3); background: rgba(0,212,255,0.8); }
+      to   { box-shadow: 0 0 20px rgba(0,212,255,0.8); background: var(--cyan); }
+    }
+    @keyframes wake-expand {
+      0%   { transform: rotate(45deg) scale(1);   box-shadow: 0 0 16px rgba(0,212,255,0.5); }
+      45%  { transform: rotate(45deg) scale(2.5); box-shadow: 0 0 40px rgba(0,212,255,0.6); }
+      100% { transform: rotate(45deg) scale(1);   box-shadow: 0 0 8px rgba(0,212,255,0.3); }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0; }
+    }
+
+    /* ── HISTORY DRAWER ─────────────────────────── */
+    #history {
+      position: fixed;
+      top: 40px; left: 0; bottom: 0;
+      width: 280px;
+      overflow-y: auto;
+      padding: 16px;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      background: rgba(7,7,26,0.95);
+      backdrop-filter: blur(20px);
+      border-right: 1px solid var(--border);
+      z-index: 50;
+    }
+    #history.open { display: flex; }
+    .hist-entry {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.5px;
+      line-height: 1.6;
+      color: var(--dimmer);
+      border-bottom: 1px solid rgba(124,58,237,0.08);
+      padding-bottom: 10px;
+    }
+    .hist-entry .hist-user { color: rgba(0,212,255,0.6); }
+    .hist-entry .hist-bot  { color: var(--dimmer); }
+
+    /* ── PHASE 1 INTRO HINT ─────────────────────── */
+    #p1-hint {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 3px;
+      color: var(--dimmer);
+      text-align: center;
+      pointer-events: none;
+      white-space: nowrap;
+      text-transform: uppercase;
+    }
+
+    /* ═══════════════════════════════════════════════
+       PHASE 2 — Platform Dashboard
+    ═══════════════════════════════════════════════ */
+
+    #phase2 {
+      position: fixed;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      z-index: 5;
+      background: var(--bg);
+    }
+    #phase2.active { opacity: 1; }
+
+    /* ── P2 TOPBAR ──────────────────────────────── */
+    #p2-topbar {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 22px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 20;
+      background: rgba(7,7,26,0.8);
+      backdrop-filter: blur(16px);
+    }
+
+    #p2-brand {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 5px;
+      background: linear-gradient(90deg, var(--cyan), var(--purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-transform: uppercase;
+    }
+
+    #p2-meta {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    #p2-model-badge {
+      font-size: 9px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 1.5px;
+      color: var(--cyan);
+      opacity: 0.7;
+    }
+
+    #p2-session-badge {
+      font-size: 9px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 1px;
+      color: var(--dimmer);
+    }
+
+    #p2-controls {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    #p2-role-select {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--dimmer);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      font-family: 'JetBrains Mono', monospace;
+      cursor: pointer;
+      -webkit-appearance: none;
+      transition: color 0.2s;
+    }
+    #p2-role-select:hover { color: var(--dim); }
+    #p2-role-select option { background: #0d0d2b; color: #aaa; }
+
+    #p2-mic-toggle, #p2-audit-link {
+      background: transparent;
+      border: none;
+      color: var(--dimmer);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 0;
+      transition: color 0.2s;
+    }
+    #p2-mic-toggle:hover, #p2-audit-link:hover { color: var(--dim); }
+    #p2-mic-toggle.active { color: var(--cyan); animation: mic-pulse 1s ease-in-out infinite alternate; text-shadow: 0 0 8px var(--cyan-glow); }
+
+    /* ── P2 THREE-COLUMN LAYOUT ─────────────────── */
+    #p2-layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 240px 1fr 228px;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ── LEFT: LOG PANEL ─────────────────────────── */
+    #p2-log-panel {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      overflow: hidden;
+      background: rgba(13,13,43,0.3);
+    }
+
+    #p2-log-header {
+      font-size: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 3px;
+      color: var(--dimmer);
+      padding: 13px 14px 9px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      text-transform: uppercase;
+    }
+
+    #p2-log-entries {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .p2-log-entry {
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.2px;
+      line-height: 1.6;
+      border-bottom: 1px solid rgba(124,58,237,0.08);
+      padding-bottom: 10px;
+      background: rgba(13,13,43,0.4);
+      border-radius: 4px;
+      padding: 7px 9px 8px;
+      border: 1px solid rgba(124,58,237,0.08);
+      margin-bottom: 2px;
+    }
+    .p2-log-user {
+      color: rgba(0,212,255,0.55);
+      margin-bottom: 4px;
+      word-break: break-word;
+    }
+    .p2-log-user::before { content: '> '; color: var(--cyan); opacity: 0.7; }
+    .p2-log-bot {
+      color: var(--dimmer);
+      word-break: break-word;
+      line-height: 1.5;
+    }
+
+    /* ── CENTER: MAIN PANEL ──────────────────────── */
+    #p2-main {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #p2-response-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 36px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scroll-behavior: smooth;
+    }
+
+    #p2-transcript-bubble {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 1px;
+      color: var(--dimmer);
+      font-style: italic;
+      transition: color 0.2s;
+      min-height: 0;
+    }
+    #p2-transcript-bubble.active { color: var(--cyan); }
+
+    /* ── MARKDOWN RENDER TARGET ─────────────────── */
+    #p2-response-content {
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.85;
+      color: rgba(232,234,240,0.85);
+      letter-spacing: 0.2px;
+      max-width: 720px;
+      user-select: text;
+      cursor: text;
+      transition: background 0.3s;
+    }
+
+    #p2-response-content h1,
+    #p2-response-content h2,
+    #p2-response-content h3 {
+      color: var(--cyan);
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      margin-top: 22px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      text-transform: uppercase;
+      border-bottom: 1px solid rgba(0,212,255,0.15);
+      padding-bottom: 6px;
+    }
+    #p2-response-content h1:first-child,
+    #p2-response-content h2:first-child,
+    #p2-response-content h3:first-child { margin-top: 0; }
+
+    #p2-response-content p { margin: 8px 0; color: rgba(232,234,240,0.75); }
+    #p2-response-content strong { color: var(--white); font-weight: 600; }
+    #p2-response-content em { color: rgba(0,212,255,0.7); font-style: italic; }
+
+    #p2-response-content code {
+      background: rgba(124,58,237,0.15);
+      border: 1px solid rgba(124,58,237,0.25);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--cyan);
+    }
+
+    #p2-response-content pre {
+      background: rgba(7,7,26,0.8);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--purple);
+      border-radius: 6px;
+      padding: 14px 18px;
+      overflow-x: auto;
+      margin: 12px 0;
+    }
+    #p2-response-content pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      color: rgba(232,234,240,0.6);
+      border-radius: 0;
+    }
+
+    #p2-response-content ul,
+    #p2-response-content ol {
+      padding-left: 20px;
+      margin: 8px 0;
+      color: rgba(232,234,240,0.65);
+    }
+    #p2-response-content li { margin: 5px 0; }
+
+    #p2-response-content table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 14px 0;
+      font-size: 12px;
+    }
+    #p2-response-content th {
+      color: var(--cyan);
+      letter-spacing: 2px;
+      font-size: 9px;
+      font-weight: 600;
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(0,212,255,0.2);
+      text-transform: uppercase;
+      background: rgba(0,212,255,0.05);
+    }
+    #p2-response-content td {
+      padding: 7px 12px;
+      border-bottom: 1px solid rgba(124,58,237,0.1);
+      color: rgba(232,234,240,0.6);
+    }
+    #p2-response-content tr:hover td { color: rgba(232,234,240,0.85); background: rgba(124,58,237,0.05); }
+
+    #p2-response-content blockquote {
+      border-left: 3px solid var(--purple);
+      padding-left: 16px;
+      color: rgba(232,234,240,0.5);
+      margin: 10px 0;
+      background: rgba(124,58,237,0.05);
+      border-radius: 0 4px 4px 0;
+      padding: 10px 16px;
+    }
+    #p2-response-content a { color: var(--cyan); text-decoration: none; }
+    #p2-response-content a:hover { text-decoration: underline; }
+    #p2-response-content hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 16px 0;
+    }
+
+    /* P2 thinking dots + waveform */
+    #p2-thinking-dots {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+    }
+    #p2-thinking-dots.active { display: flex; }
+    #p2-thinking-dots span {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--cyan-dim);
+      border: 1px solid var(--cyan);
+      animation: dot-pulse 1.2s ease-in-out infinite;
+    }
+    #p2-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+    #p2-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    #p2-waveform {
+      display: none;
+      align-items: center;
+      gap: 3px;
+      height: 20px;
+      padding: 2px 0;
+    }
+    #p2-waveform.active { display: flex; }
+    #p2-waveform span {
+      display: block;
+      width: 3px; height: 4px;
+      background: var(--cyan);
+      border-radius: 2px;
+      box-shadow: 0 0 4px var(--cyan-glow);
+    }
+    #p2-waveform.active span { animation: wave-bar 0.8s ease-in-out infinite alternate; }
+    #p2-waveform.active span:nth-child(1) { animation-delay: 0.0s; }
+    #p2-waveform.active span:nth-child(2) { animation-delay: 0.1s; }
+    #p2-waveform.active span:nth-child(3) { animation-delay: 0.2s; }
+    #p2-waveform.active span:nth-child(4) { animation-delay: 0.3s; }
+    #p2-waveform.active span:nth-child(5) { animation-delay: 0.4s; }
+    #p2-waveform.active span:nth-child(6) { animation-delay: 0.3s; }
+    #p2-waveform.active span:nth-child(7) { animation-delay: 0.2s; }
+
+    /* ── P2 INPUT BAR ────────────────────────────── */
+    #p2-input-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      padding: 10px 18px 14px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      background: rgba(7,7,26,0.6);
+      backdrop-filter: blur(8px);
+    }
+
+    #p2-diamond {
+      width: 9px; height: 9px;
+      background: rgba(0,212,255,0.6);
+      transform: rotate(45deg);
+      flex-shrink: 0;
+      margin-bottom: 10px;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    #p2-diamond.idle      { background: rgba(0,212,255,0.4); box-shadow: 0 0 6px rgba(0,212,255,0.2); }
+    #p2-diamond.typing    { background: var(--cyan); box-shadow: 0 0 10px var(--cyan-glow); }
+    #p2-diamond.listening { background: var(--cyan); box-shadow: 0 0 16px rgba(0,212,255,0.7); }
+    #p2-diamond.speaking  { background: var(--cyan); animation: speaking-pulse 0.9s ease-in-out infinite alternate; }
+    #p2-diamond.blocked   { background: var(--coral); box-shadow: 0 0 12px var(--coral-glow); }
+    #p2-diamond.confirm   { background: var(--amber); box-shadow: 0 0 12px rgba(245,158,11,0.5); }
+
+    #p2-input {
+      flex: 1;
+      background: rgba(13,13,43,0.7);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--white);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 13.5px;
+      font-weight: 300;
+      letter-spacing: 0.2px;
+      padding: 9px 14px;
+      outline: none;
+      resize: none;
+      min-height: 38px;
+      max-height: 160px;
+      caret-color: var(--cyan);
+      user-select: text;
+      line-height: 1.6;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    #p2-input:focus {
+      border-color: rgba(0,212,255,0.4);
+      box-shadow: 0 0 0 2px rgba(0,212,255,0.08), 0 0 20px rgba(0,212,255,0.06);
+    }
+    #p2-input::placeholder { color: var(--dimmer); }
+
+    #p2-send-btn {
+      background: linear-gradient(135deg, rgba(124,58,237,0.8), rgba(0,212,255,0.6));
+      border: 1px solid rgba(0,212,255,0.3);
+      border-radius: 7px;
+      color: var(--white);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      padding: 0 14px;
+      cursor: pointer;
+      transition: opacity 0.2s, box-shadow 0.2s;
+      flex-shrink: 0;
+      height: 38px;
+    }
+    #p2-send-btn:hover { opacity: 0.85; box-shadow: 0 0 16px rgba(0,212,255,0.2); }
+
+    #p2-input-hint {
+      font-size: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 1.5px;
+      color: var(--dimmer);
+      opacity: 0.4;
+      padding: 0 18px 8px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* ── RIGHT: INFO PANEL ─────────────────────────── */
+    #p2-info-panel {
+      border-left: 1px solid var(--border);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      background: rgba(13,13,43,0.3);
+    }
+
+    .p2-panel-section {
+      padding: 14px 14px 12px;
+      border-bottom: 1px solid rgba(124,58,237,0.1);
+    }
+
+    .p2-panel-heading {
+      font-size: 7px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 3px;
+      color: rgba(124,58,237,0.7);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    /* About / Intro section */
+    #p2-about-text {
+      font-size: 10px;
+      letter-spacing: 0.2px;
+      color: var(--dimmer);
+      line-height: 1.7;
+    }
+
+    /* Capabilities */
+    #p2-capabilities-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .p2-cap-item {
+      font-size: 10px;
+      letter-spacing: 0.3px;
+      color: var(--dimmer);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 2px 0;
+    }
+    .p2-cap-dot {
+      width: 5px; height: 5px;
+      background: rgba(124,58,237,0.3);
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .p2-cap-item.available { color: rgba(232,234,240,0.6); }
+    .p2-cap-item.available .p2-cap-dot {
+      background: var(--cyan);
+      box-shadow: 0 0 6px var(--cyan-glow);
+    }
+
+    /* Session info */
+    .p2-info-row {
+      font-size: 9px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(124,58,237,0.06);
+    }
+    .p2-info-key { color: rgba(124,58,237,0.5); }
+    .p2-info-val { color: var(--dimmer); font-size: 9px; }
+    #p2-conn-val { color: var(--dimmer); }
+    #p2-conn-val.live { color: var(--cyan); text-shadow: 0 0 6px var(--cyan-glow); }
+
+    /* Quick reference */
+    .p2-ref-row {
+      font-size: 9px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.3px;
+      color: var(--dimmer);
+      padding: 4px 0;
+      display: flex;
+      gap: 8px;
+    }
+    .p2-ref-key { color: rgba(0,212,255,0.5); min-width: 80px; }
+
+    /* Status */
+    #p2-status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+    }
+    #p2-diamond-status {
+      width: 7px; height: 7px;
+      background: rgba(0,212,255,0.5);
+      transform: rotate(45deg);
+      transition: background 0.2s, box-shadow 0.2s;
+      flex-shrink: 0;
+    }
+    #p2-status-text {
+      font-size: 9px;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 2px;
+      color: var(--dimmer);
+      transition: color 0.2s;
+    }
+
+    /* ── TOOL STATUS PILLS (glassmorphism) ──────── */
+    #p2-tool-status-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0 0 10px 0;
+      min-height: 0;
+    }
+    .tool-pill {
+      font: 500 9px/1 'JetBrains Mono', monospace;
+      padding: 4px 10px;
+      border-radius: 5px;
+      letter-spacing: 1px;
+      transition: all 0.2s ease;
+      background: rgba(13,13,43,0.6);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(124,58,237,0.2);
+      border-left-width: 3px;
+    }
+    .tool-pill.running {
+      color: var(--amber);
+      border-left-color: var(--amber);
+      border-color: rgba(245,158,11,0.2);
+      background: rgba(245,158,11,0.08);
+      animation: tool-pill-pulse 0.7s ease-in-out infinite;
+      box-shadow: 0 0 12px rgba(245,158,11,0.1);
+    }
+    /* Per-skill done colors — left border + text + subtle bg */
+    .tool-pill.done { color: var(--cyan); border-left-color: var(--cyan); background: var(--cyan-dim); }
+    .tool-pill.skill-case_lookup.done     { color: #60b4ff; border-left-color: #60b4ff; background: rgba(96,180,255,0.08); }
+    .tool-pill.skill-conflict_check.done  { color: var(--coral); border-left-color: var(--coral); background: var(--coral-dim); }
+    .tool-pill.skill-draft_motion.done    { color: #b97aff; border-left-color: #b97aff; background: var(--purple-dim); }
+    .tool-pill.skill-calendar.done        { color: #2de8ff; border-left-color: #2de8ff; background: rgba(45,232,255,0.08); }
+    .tool-pill.skill-document_search.done { color: #60d4a0; border-left-color: #60d4a0; background: rgba(96,212,160,0.08); }
+    .tool-pill.skill-billing.done         { color: #70d488; border-left-color: #70d488; background: rgba(112,212,136,0.08); }
+    .tool-pill.skill-web_search.done      { color: var(--amber); border-left-color: var(--amber); background: var(--amber-dim); }
+    .tool-pill.skill-browser.done         { color: #f472b6; border-left-color: #f472b6; background: rgba(244,114,182,0.08); }
+    .tool-pill.skill-mcp_runner.done      { color: #94a3b8; border-left-color: #94a3b8; background: rgba(148,163,184,0.08); }
+
+    /* Plan header line */
+    #p2-plan-line {
+      font: 500 9px/1.6 'JetBrains Mono', monospace;
+      color: transparent;
+      letter-spacing: 1px;
+      padding: 0 0 6px 0;
+      min-height: 0;
+      white-space: normal;
+      overflow: visible;
+      word-break: break-word;
+    }
+    #p2-plan-line.active {
+      color: rgba(124,58,237,0.6);
+      text-shadow: 0 0 10px rgba(124,58,237,0.3);
+    }
+    /* #AmazonNova credit badge inside the plan header */
+    .nova-badge {
+      display: inline-block;
+      font: 600 8px/1 'JetBrains Mono', monospace;
+      letter-spacing: 1.5px;
+      color: var(--cyan);
+      background: var(--cyan-dim);
+      border: 1px solid rgba(0,212,255,0.3);
+      border-radius: 4px;
+      padding: 2px 6px;
+      text-shadow: 0 0 8px var(--cyan-glow);
+      box-shadow: 0 0 6px var(--cyan-glow);
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+
+    /* ── CONFLICT WARNING BANNER ─────────────────── */
+    #p2-conflict-banner {
+      display: none;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,107,107,0.4);
+      background: rgba(255,107,107,0.08);
+      backdrop-filter: blur(8px);
+      animation: conflict-enter 0.3s ease;
+    }
+    #p2-conflict-banner.visible { display: flex; }
+    @keyframes conflict-enter {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    #p2-conflict-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    #p2-conflict-body { flex: 1; }
+    #p2-conflict-title {
+      font: 600 11px/1 'JetBrains Mono', monospace;
+      letter-spacing: 2px;
+      color: var(--coral);
+      text-shadow: 0 0 10px var(--coral-glow);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    #p2-conflict-detail {
+      font: 400 10px/1.6 'JetBrains Mono', monospace;
+      color: rgba(255,107,107,0.75);
+      white-space: pre-line;
+    }
+
+    @keyframes tool-pill-pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    /* ── LIVE AUDIT PANEL ────────────────────────── */
+    #p2-audit-live-dot {
+      color: var(--cyan);
+      font-size: 8px;
+      margin-left: 4px;
+      animation: tool-pill-pulse 2s ease-in-out infinite;
+      text-shadow: 0 0 6px var(--cyan-glow);
+    }
+    #p2-audit-entries {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .p2-audit-row {
+      font: 9px/1.5 'JetBrains Mono', monospace;
+      padding: 5px 7px;
+      border-radius: 4px;
+      letter-spacing: 0.3px;
+      background: rgba(13,13,43,0.5);
+      border: 1px solid transparent;
+    }
+    .p2-audit-outcome { font-weight: 600; }
+    .p2-audit-row.p2a-allow {
+      border-color: rgba(0,212,255,0.1);
+    }
+    .p2-audit-row.p2a-allow .p2-audit-outcome {
+      color: var(--cyan);
+      text-shadow: 0 0 6px var(--cyan-glow);
+    }
+    .p2-audit-row.p2a-block {
+      border-color: rgba(255,107,107,0.15);
+      background: rgba(255,107,107,0.06);
+    }
+    .p2-audit-row.p2a-block .p2-audit-outcome {
+      color: var(--coral);
+      text-shadow: 0 0 6px var(--coral-glow);
+    }
+    .p2-audit-row.p2a-warn {
+      border-color: rgba(245,158,11,0.15);
+    }
+    .p2-audit-row.p2a-warn  .p2-audit-outcome {
+      color: var(--amber);
+      text-shadow: 0 0 6px rgba(245,158,11,0.3);
+    }
+    .p2-audit-action { color: rgba(124,58,237,0.6); }
+    .p2-audit-ts { color: var(--dimmer); opacity: 0.5; }
+
+    /* ── SCROLLBARS ──────────────────────────────── */
+    ::-webkit-scrollbar { width: 3px; height: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 2px; }
+
+    /* ── RESPONSIVE ──────────────────────────────── */
+    @media (max-width: 960px) {
+      #p2-layout { grid-template-columns: 200px 1fr; }
+      #p2-info-panel { display: none; }
+    }
+    @media (max-width: 640px) {
+      #p2-layout { grid-template-columns: 1fr; }
+      #p2-log-panel { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════ PHASE 1 ═══════════════ -->
+  <div id="phase1">
+
+    <div id="topbar">
+      <span id="status-label">CONNECTING</span>
+      <div id="topbar-right">
+        <select id="role-select">
+          <option value="attorney">ATTORNEY</option>
+          <option value="paralegal">PARALEGAL</option>
+          <option value="clinician">CLINICIAN</option>
+          <option value="analyst">ANALYST</option>
+          <option value="reviewer">REVIEWER</option>
+        </select>
+        <button id="mic-toggle" onclick="toggleMic()" title="Click or hold M for voice">MIC</button>
+        <button id="hist-toggle" onclick="toggleHistory()">LOG</button>
+      </div>
+    </div>
+
+    <div id="history"></div>
+
+    <div id="stage">
+      <div id="anchor">
+
+        <div id="transcript-bubble"></div>
+
+        <div id="response-text">
+          <span id="text-content"></span><span id="resp-cursor"></span>
+        </div>
+
+        <div id="line-zone" onclick="activateInline()">
+          <div id="line-left"></div>
+          <div id="line-right"></div>
+          <div id="line-input-wrap">
+            <textarea id="line-input" rows="1" autocomplete="off" spellcheck="false"></textarea>
+          </div>
+          <div id="expand-wrap">
+            <textarea id="expand-input" autocomplete="off" spellcheck="false"
+              placeholder="paste or type a longer message..."></textarea>
+            <div id="expand-hint">ENTER TO SEND · ESC TO CLOSE</div>
+          </div>
+        </div>
+
+        <div id="diamond-wrap" onclick="activateExpand()">
+          <div id="diamond"></div>
+        </div>
+
+        <div id="waveform">
+          <span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span>
+        </div>
+
+        <div id="thinking-dots">
+          <span></span><span></span><span></span>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="p1-hint">TYPE A MESSAGE OR HOLD M FOR VOICE</div>
+
+  </div><!-- /phase1 -->
+
+
+  <!-- ═══════════════ PHASE 2 ═══════════════ -->
+  <div id="phase2">
+
+    <div id="p2-topbar">
+      <span id="p2-brand">SAMARITAN</span>
+      <div id="p2-meta">
+        <span id="p2-model-badge">nova-2-lite</span>
+        <span id="p2-session-badge">session: —</span>
+      </div>
+      <div id="p2-controls">
+        <select id="p2-role-select">
+          <option value="attorney">ATTORNEY</option>
+          <option value="paralegal">PARALEGAL</option>
+          <option value="clinician">CLINICIAN</option>
+          <option value="analyst">ANALYST</option>
+          <option value="reviewer">REVIEWER</option>
+        </select>
+        <button id="p2-mic-toggle" title="Click or hold M for voice">MIC</button>
+        <button id="p2-audit-link">AUDIT</button>
+      </div>
+    </div>
+
+    <div id="p2-layout">
+
+      <!-- LEFT: Session Log -->
+      <div id="p2-log-panel">
+        <div id="p2-log-header">SESSION LOG</div>
+        <div id="p2-log-entries"></div>
+      </div>
+
+      <!-- CENTER: Response + Input -->
+      <div id="p2-main">
+        <div id="p2-response-area">
+          <div id="p2-transcript-bubble"></div>
+          <div id="p2-plan-line"></div>
+          <div id="p2-tool-status-bar"></div>
+          <div id="p2-conflict-banner">
+            <div id="p2-conflict-icon">⚠</div>
+            <div id="p2-conflict-body">
+              <div id="p2-conflict-title">CONFLICT OF INTEREST DETECTED</div>
+              <div id="p2-conflict-detail"></div>
+            </div>
+          </div>
+          <div id="p2-response-content"></div>
+          <div id="p2-thinking-dots">
+            <span></span><span></span><span></span>
+          </div>
+          <div id="p2-waveform">
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+
+        <div id="p2-input-bar">
+          <div id="p2-diamond"></div>
+          <textarea id="p2-input" rows="1"
+            placeholder="type a message or hold M for voice..."
+            autocomplete="off" spellcheck="false"></textarea>
+          <button id="p2-send-btn">SEND</button>
+        </div>
+        <div id="p2-input-hint">ENTER TO SEND · SHIFT+ENTER FOR NEWLINE · M FOR VOICE</div>
+      </div>
+
+      <!-- RIGHT: Info Panel -->
+      <div id="p2-info-panel">
+
+        <div class="p2-panel-section">
+          <div class="p2-panel-heading">ABOUT</div>
+          <div id="p2-about-text">
+            Samaritan is a multi-domain AI agent built for legal, clinical, and enterprise workflows.
+            It streams responses in real time, supports voice input, and logs every interaction
+            for audit.
+          </div>
+        </div>
+
+        <div class="p2-panel-section">
+          <div class="p2-panel-heading">CAPABILITIES</div>
+          <div id="p2-capabilities-list">
+            <div class="p2-cap-item" data-skill="case_lookup">
+              <div class="p2-cap-dot"></div>Case Lookup
+            </div>
+            <div class="p2-cap-item" data-skill="draft_motion">
+              <div class="p2-cap-dot"></div>Draft Motion
+            </div>
+            <div class="p2-cap-item" data-skill="document_search">
+              <div class="p2-cap-dot"></div>Document Search
+            </div>
+            <div class="p2-cap-item" data-skill="calendar">
+              <div class="p2-cap-dot"></div>Calendar
+            </div>
+            <div class="p2-cap-item" data-skill="billing">
+              <div class="p2-cap-dot"></div>Billing
+            </div>
+            <div class="p2-cap-item" data-skill="web_search">
+              <div class="p2-cap-dot"></div>Web Search
+            </div>
+            <div class="p2-cap-item" data-skill="browser">
+              <div class="p2-cap-dot"></div>Browser
+            </div>
+            <div class="p2-cap-item" data-skill="mcp">
+              <div class="p2-cap-dot"></div>MCP Tools
+            </div>
+            <div class="p2-cap-item" data-skill="conflict_check">
+              <div class="p2-cap-dot"></div>Conflict Check
+            </div>
+          </div>
+        </div>
+
+        <div class="p2-panel-section">
+          <div class="p2-panel-heading">SESSION</div>
+          <div class="p2-info-row">
+            <span class="p2-info-key">ID</span>
+            <span class="p2-info-val" id="p2-session-id-val">—</span>
+          </div>
+          <div class="p2-info-row">
+            <span class="p2-info-key">ROLE</span>
+            <span class="p2-info-val" id="p2-role-val">—</span>
+          </div>
+          <div class="p2-info-row">
+            <span class="p2-info-key">MODEL</span>
+            <span class="p2-info-val" id="p2-model-val">nova-2-lite</span>
+          </div>
+          <div class="p2-info-row">
+            <span class="p2-info-key">CONN</span>
+            <span id="p2-conn-val">—</span>
+          </div>
+        </div>
+
+        <div class="p2-panel-section">
+          <div class="p2-panel-heading">QUICK REFERENCE</div>
+          <div class="p2-ref-row">
+            <span class="p2-ref-key">M (hold)</span>
+            <span>push-to-talk</span>
+          </div>
+          <div class="p2-ref-row">
+            <span class="p2-ref-key">ENTER</span>
+            <span>send message</span>
+          </div>
+          <div class="p2-ref-row">
+            <span class="p2-ref-key">SHIFT+ENTER</span>
+            <span>newline</span>
+          </div>
+          <div class="p2-ref-row">
+            <span class="p2-ref-key">AUDIT</span>
+            <span>view audit log</span>
+          </div>
+        </div>
+
+        <div class="p2-panel-section">
+          <div class="p2-panel-heading">STATUS</div>
+          <div id="p2-status-indicator">
+            <div id="p2-diamond-status"></div>
+            <span id="p2-status-text">IDLE</span>
+          </div>
+        </div>
+
+        <div class="p2-panel-section" id="p2-audit-section">
+          <div class="p2-panel-heading">AUDIT TRAIL <span id="p2-audit-live-dot">●</span></div>
+          <div id="p2-audit-entries">
+            <div class="p2-audit-row p2a-warn" style="color:#141414">
+              <span class="p2-audit-action">waiting for events</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /p2-info-panel -->
+    </div><!-- /p2-layout -->
+  </div><!-- /phase2 -->
+
+
+  <script>
+    // ── marked.js config ───────────────────────────────────
+    if (typeof marked !== 'undefined') {
+      marked.setOptions({ breaks: true, gfm: true });
+    }
+
+    // ── Phase 1 DOM refs ───────────────────────────────────
+    const statusLabel   = document.getElementById('status-label');
+    const responseText  = document.getElementById('response-text');
+    const textContent   = document.getElementById('text-content');
+    const respCursor    = document.getElementById('resp-cursor');
+    const transcriptBub = document.getElementById('transcript-bubble');
+    const lineLeft      = document.getElementById('line-left');
+    const lineRight     = document.getElementById('line-right');
+    const lineInputWrap = document.getElementById('line-input-wrap');
+    const lineInput     = document.getElementById('line-input');
+    const expandWrap    = document.getElementById('expand-wrap');
+    const expandInput   = document.getElementById('expand-input');
+    const diamond       = document.getElementById('diamond');
+    const thinkingDots  = document.getElementById('thinking-dots');
+    const waveformEl    = document.getElementById('waveform');
+    const historyEl     = document.getElementById('history');
+    const micToggle     = document.getElementById('mic-toggle');
+    const roleSelect    = document.getElementById('role-select');
+
+    // ── Phase 2 DOM refs ───────────────────────────────────
+    const p1El              = document.getElementById('phase1');
+    const p2El              = document.getElementById('phase2');
+    const p2ResponseContent = document.getElementById('p2-response-content');
+    const p2ThinkingDots    = document.getElementById('p2-thinking-dots');
+    const p2WaveformEl      = document.getElementById('p2-waveform');
+    const p2TranscriptBub   = document.getElementById('p2-transcript-bubble');
+    const p2Diamond         = document.getElementById('p2-diamond');
+    const p2StatusText      = document.getElementById('p2-status-text');
+    const p2DiamondStatus   = document.getElementById('p2-diamond-status');
+    const p2MicToggle       = document.getElementById('p2-mic-toggle');
+    const p2Input           = document.getElementById('p2-input');
+    const p2LogEntries      = document.getElementById('p2-log-entries');
+    const p2ConnVal         = document.getElementById('p2-conn-val');
+    const p2RoleSelect      = document.getElementById('p2-role-select');
+    const p2ResponseArea    = document.getElementById('p2-response-area');
+
+    // ── State ──────────────────────────────────────────────
+    let ws             = null;
+    let reconnectDelay = 1000;
+    let lineAnimFrame  = null;
+    let currentText    = '';
+    let currentState   = 'idle';
+    let historyOpen    = false;
+    let lastUserInput  = '';
+    let phaseTransitioned = false;
+    let activePhase    = 1;
+    let _displaySessionId = '—';
+    let activeCaseId   = 'global';  // persists across sendMessage() calls; set by demo trigger
+
+    const LINE_MIN = 140;
+
+    function getRole() { return roleSelect.value; }
+
+    // ── Phase transition ───────────────────────────────────
+    function transitionToPhase2() {
+      if (phaseTransitioned) return;
+      phaseTransitioned = true;
+      activePhase = 2;
+
+      populatePhase2Meta();
+      startAuditPolling();   // Start live audit trail refresh
+
+      p2El.style.display = 'flex';
+      requestAnimationFrame(() => {
+        p1El.classList.add('exiting');
+        setTimeout(() => {
+          p2El.classList.add('active');
+        }, 350);
+        setTimeout(() => {
+          p1El.style.display = 'none';
+        }, 700);
+      });
+    }
+
+    function updateCapabilities(role) {
+      fetch('/roles')
+        .then(r => r.json())
+        .then(data => {
+          const info = data[role] || {};
+          const skills = info.allowed_skills || [];
+          document.querySelectorAll('.p2-cap-item').forEach(el => {
+            const sk = el.dataset.skill;
+            if (skills.includes(sk)) el.classList.add('available');
+            else el.classList.remove('available');
+          });
+        })
+        .catch(() => {
+          // Fallback: mark common skills available
+          const defaults = ['case_lookup','draft_motion','document_search','calendar','billing','web_search','conflict_check'];
+          document.querySelectorAll('.p2-cap-item').forEach(el => {
+            if (defaults.includes(el.dataset.skill)) el.classList.add('available');
+          });
+        });
+    }
+
+    function populatePhase2Meta() {
+      const role = getRole();
+      document.getElementById('p2-session-id-val').textContent = _displaySessionId;
+      document.getElementById('p2-role-val').textContent = role.toUpperCase();
+      document.getElementById('p2-session-badge').textContent = 'session: ' + _displaySessionId;
+      p2RoleSelect.value = role;
+
+      // Fetch live role capabilities (eagerly update dots)
+      updateCapabilities(role);
+    }
+
+    // ── State machine ──────────────────────────────────────
+    function setState(state) {
+      currentState = state;
+      const labels = {
+        idle:      'SAMARITAN',  typing:    'SAMARITAN',
+        listening: 'LISTENING',  speaking:  'THINKING',
+        blocked:   'BLOCKED',    confirm:   'CONFIRM',
+        wake:      'SAMARITAN',
+      };
+      const label = labels[state] || 'SAMARITAN';
+
+      // Phase 1
+      statusLabel.textContent = label;
+      statusLabel.className   = state;
+      diamond.className       = state;
+
+      const lineClass = ['blocked','confirm','speaking','typing','listening'].includes(state) ? state : '';
+      lineLeft.className  = lineClass;
+      lineRight.className = lineClass;
+
+      thinkingDots.classList.toggle('active', state === 'speaking');
+      waveformEl.classList.toggle('active', state === 'listening');
+
+      if (state === 'idle') retractLine();
+
+      // Phase 2
+      p2Diamond.className = state;
+      p2StatusText.textContent = label;
+
+      const stateColors = {
+        idle:      'rgba(0,212,255,0.4)',
+        typing:    'var(--cyan)',
+        listening: 'var(--cyan)',
+        speaking:  'var(--cyan)',
+        blocked:   'var(--coral)',
+        confirm:   'var(--amber)',
+        wake:      'var(--cyan)',
+      };
+      const stateGlows = {
+        listening: '0 0 10px rgba(0,212,255,0.6)',
+        speaking:  '0 0 10px rgba(0,212,255,0.5)',
+        typing:    '0 0 8px rgba(0,212,255,0.4)',
+        blocked:   '0 0 10px rgba(255,107,107,0.5)',
+        confirm:   '0 0 10px rgba(245,158,11,0.5)',
+      };
+      p2DiamondStatus.style.background = stateColors[state] || 'rgba(0,212,255,0.3)';
+      p2DiamondStatus.style.boxShadow  = stateGlows[state] || 'none';
+
+      // Color the status text
+      const textColorMap = {
+        listening: 'var(--cyan)', speaking: 'var(--cyan)', typing: 'var(--cyan)',
+        blocked: 'var(--coral)', confirm: 'var(--amber)',
+      };
+      p2StatusText.style.color = textColorMap[state] || 'var(--dimmer)';
+
+      p2ThinkingDots.classList.toggle('active', state === 'speaking');
+      p2WaveformEl.classList.toggle('active', state === 'listening');
+    }
+
+    // ── Line animation ─────────────────────────────────────
+    function setLineWidth(px) {
+      const half = px / 2;
+      lineLeft.style.width  = half + 'px';
+      lineRight.style.width = half + 'px';
+    }
+
+    function animateLine(targetPx) {
+      if (lineAnimFrame) cancelAnimationFrame(lineAnimFrame);
+      function step() {
+        const cur  = (parseFloat(lineLeft.style.width) || 0) * 2;
+        const diff = targetPx - cur;
+        if (Math.abs(diff) < 0.5) { setLineWidth(targetPx); return; }
+        setLineWidth(cur + diff * 0.18);
+        lineAnimFrame = requestAnimationFrame(step);
+      }
+      step();
+    }
+
+    function growLineToText() {
+      const rect   = responseText.getBoundingClientRect();
+      const target = Math.max(rect.width + 32, LINE_MIN);
+      animateLine(target);
+    }
+
+    function retractLine() { setTimeout(() => animateLine(LINE_MIN), 600); }
+
+    let _canvas, _ctx;
+    function measureTextWidth(str) {
+      if (!_canvas) {
+        _canvas = document.createElement('canvas');
+        _ctx = _canvas.getContext('2d');
+        _ctx.font = '14px "Share Tech Mono", monospace';
+      }
+      return _ctx.measureText(str).width;
+    }
+
+    // ── Inline input ───────────────────────────────────────
+    function activateInline() {
+      if (['speaking','listening','wake'].includes(currentState)) return;
+      if (expandWrap.classList.contains('active')) return;
+      closeExpand();
+      lineInputWrap.classList.add('active');
+      lineInput.focus();
+      setState('typing');
+      animateLine(LINE_MIN);
+    }
+
+    function closeInline() {
+      lineInputWrap.classList.remove('active');
+      lineInput.value = '';
+      lineInput.style.height = '';
+      if (currentState === 'typing') setState('idle');
+    }
+
+    function autoGrowInline() {
+      lineInput.style.height = 'auto';
+      lineInput.style.height = lineInput.scrollHeight + 'px';
+      const lines = lineInput.value.split('\n');
+      const longest = lines.reduce((a, b) => a.length > b.length ? a : b, '');
+      const w = measureTextWidth(longest) + 48;
+      animateLine(Math.max(Math.min(w, lineInputWrap.offsetWidth), LINE_MIN));
+    }
+
+    lineInput.addEventListener('input', autoGrowInline);
+    lineInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+      else if (e.key === 'Escape') closeInline();
+    });
+    lineInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        if (document.activeElement !== lineInput && currentState === 'typing') closeInline();
+      }, 150);
+    });
+
+    // ── Expanded textarea ──────────────────────────────────
+    function activateExpand() {
+      if (['speaking','listening','wake'].includes(currentState)) return;
+      closeInline();
+      expandWrap.classList.add('active');
+      expandInput.focus();
+      setState('typing');
+      animateLine(Math.min(560, window.innerWidth * 0.8));
+    }
+
+    function closeExpand() {
+      expandWrap.classList.remove('active');
+      expandInput.value = '';
+      if (currentState === 'typing') setState('idle');
+    }
+
+    expandInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+      else if (e.key === 'Escape') closeExpand();
+    });
+    expandInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        if (document.activeElement !== expandInput && currentState === 'typing') closeExpand();
+      }, 150);
+    });
+
+    document.getElementById('stage').addEventListener('click', (e) => {
+      const isDiamond  = e.target.closest('#diamond-wrap');
+      const isLineZone = e.target.closest('#line-zone');
+      if (!isDiamond && !isLineZone && !['speaking','listening','wake'].includes(currentState)) {
+        activateInline();
+      }
+    });
+
+    // ── Wake word ──────────────────────────────────────────
+    function triggerWakeWord() {
+      closeInline(); closeExpand();
+      setState('wake');
+      textContent.textContent = '';
+      setLineWidth(LINE_MIN);
+      setTimeout(() => setState('idle'), 900);
+    }
+
+    // ── Text rendering (streaming) ─────────────────────────
+    function startResponse() {
+      closeInline(); closeExpand();
+      currentText = '';
+
+      // Phase 1
+      textContent.textContent = '';
+      responseText.className = '';
+      respCursor.className = 'active';
+
+      // Phase 2
+      p2ResponseContent.innerHTML = '';
+
+      // Clear plan line + conflict banner + tool status pills from previous turn
+      const planLine = document.getElementById('p2-plan-line');
+      if (planLine) { planLine.textContent = ''; planLine.className = ''; }
+      const pillBar = document.getElementById('p2-tool-status-bar');
+      if (pillBar) pillBar.innerHTML = '';
+      const conflictBanner = document.getElementById('p2-conflict-banner');
+      if (conflictBanner) conflictBanner.classList.remove('visible');
+
+      setState('speaking');
+    }
+
+    function appendChunk(chunk) {
+      thinkingDots.classList.remove('active');
+      currentText += chunk;
+
+      // Phase 1
+      textContent.textContent = currentText;
+      growLineToText();
+
+      // Phase 2 — re-render markdown
+      if (typeof marked !== 'undefined') {
+        p2ResponseContent.innerHTML = marked.parse(currentText);
+      } else {
+        p2ResponseContent.textContent = currentText;
+      }
+      p2ResponseArea.scrollTop = p2ResponseArea.scrollHeight;
+    }
+
+    function endResponse() {
+      respCursor.className = '';
+
+      if (currentText.startsWith("I'm unable to process") ||
+          currentText.startsWith('REQUEST BLOCKED')) {
+        responseText.className = 'blocked';
+        setState('blocked');
+        // Flash Phase 2 content area red
+        p2ResponseContent.style.transition = 'background 0.1s';
+        p2ResponseContent.style.background = '#1a0000';
+        setTimeout(() => { p2ResponseContent.style.background = ''; }, 800);
+        // Instant audit refresh — don't wait 3s
+        refreshAudit();
+        setTimeout(() => setState('idle'), 4000);
+      } else if (currentText.startsWith('CONFIRMATION REQUIRED')) {
+        responseText.className = 'confirm';
+        setState('confirm');
+      } else {
+        setState('idle');
+      }
+
+      // Final markdown render
+      if (typeof marked !== 'undefined') {
+        p2ResponseContent.innerHTML = marked.parse(currentText);
+      }
+
+      addHistory(lastUserInput, currentText);
+    }
+
+    // ── Transcript bubble ──────────────────────────────────
+    let _transcriptTimer = null;
+    function showTranscript(text) {
+      const display = '🎤 ' + text;
+
+      // Phase 1
+      transcriptBub.textContent = display;
+      transcriptBub.classList.add('active');
+
+      // Phase 2
+      p2TranscriptBub.textContent = display;
+      p2TranscriptBub.classList.add('active');
+
+      if (_transcriptTimer) clearTimeout(_transcriptTimer);
+      _transcriptTimer = setTimeout(() => {
+        transcriptBub.classList.remove('active');
+        p2TranscriptBub.classList.remove('active');
+        setTimeout(() => {
+          if (!transcriptBub.classList.contains('active')) transcriptBub.textContent = '';
+          if (!p2TranscriptBub.classList.contains('active')) p2TranscriptBub.textContent = '';
+        }, 500);
+      }, 5000);
+    }
+
+    // ── History ────────────────────────────────────────────
+    function toggleHistory() {
+      historyOpen = !historyOpen;
+      historyEl.classList.toggle('open', historyOpen);
+    }
+
+    function addHistory(user, bot) {
+      if (!user && !bot) return;
+
+      // Strip markdown symbols from bot text for a clean plain-text log preview.
+      // The full rendered response is shown in the main response area; the log is
+      // just a history indicator and should never contain raw markdown.
+      function stripMd(s) {
+        return s
+          .replace(/#{1,6}\s*/g, '')                      // headings
+          .replace(/\*{1,3}([^*]*)\*{1,3}/g, '$1')        // bold / italic
+          .replace(/`[^`]*`/g, '')                         // inline code
+          .replace(/^\s*[-*+]\s+/gm, '')                  // bullet points
+          .replace(/^\s*\d+\.\s+/gm, '')                  // numbered lists
+          .replace(/\n{2,}/g, ' ')                         // collapse blank lines
+          .replace(/\n/g, ' ')                             // collapse single newlines
+          .trim();
+      }
+
+      // Truncate user text to first line only, max 60 chars.
+      // Multi-line prompts (e.g. expanded demo triggers) show only the first sentence.
+      function truncUser(s) {
+        const firstLine = s.split('\n')[0];
+        return firstLine.slice(0, 60) + (firstLine.length > 60 ? '…' : '');
+      }
+
+      const botPreview = bot ? stripMd(bot) : '';
+
+      // Phase 1 drawer
+      const entry = document.createElement('div');
+      entry.className = 'hist-entry';
+      if (user) {
+        const u = document.createElement('div');
+        u.className = 'hist-user';
+        u.textContent = '> ' + truncUser(user);
+        entry.appendChild(u);
+      }
+      if (bot) {
+        const b = document.createElement('div');
+        b.className = 'hist-bot';
+        b.textContent = botPreview.slice(0, 120) + (botPreview.length > 120 ? '…' : '');
+        entry.appendChild(b);
+      }
+      historyEl.appendChild(entry);
+      historyEl.scrollTop = historyEl.scrollHeight;
+
+      // Phase 2 log
+      const p2Entry = document.createElement('div');
+      p2Entry.className = 'p2-log-entry';
+      if (user) {
+        const pu = document.createElement('div');
+        pu.className = 'p2-log-user';
+        pu.textContent = truncUser(user);
+        p2Entry.appendChild(pu);
+      }
+      if (bot) {
+        const pb = document.createElement('div');
+        pb.className = 'p2-log-bot';
+        pb.textContent = botPreview.slice(0, 200) + (botPreview.length > 200 ? '…' : '');
+        p2Entry.appendChild(pb);
+      }
+      p2LogEntries.appendChild(p2Entry);
+      p2LogEntries.scrollTop = p2LogEntries.scrollHeight;
+    }
+
+    // ── Audio playback ─────────────────────────────────────
+    let _audioCtx = null;
+    function getAudioCtx() {
+      if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return _audioCtx;
+    }
+
+    async function playAudio(base64Data, sampleRate, encoding) {
+      try {
+        const bytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+        const ctx = getAudioCtx();
+        let audioBuffer;
+        if (encoding === 'wav') {
+          audioBuffer = await ctx.decodeAudioData(bytes.buffer.slice(0));
+        } else {
+          const int16 = new Int16Array(bytes.buffer);
+          const f32 = new Float32Array(int16.length);
+          for (let i = 0; i < int16.length; i++) f32[i] = int16[i] / 32768.0;
+          audioBuffer = ctx.createBuffer(1, f32.length, sampleRate || 24000);
+          audioBuffer.copyToChannel(f32, 0);
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = audioBuffer;
+        src.connect(ctx.destination);
+        src.start(0);
+      } catch (err) {
+        console.warn('Audio playback error:', err);
+      }
+    }
+
+    // ── Live Audit Polling ────────────────────────────────
+    let _auditPollInterval = null;
+    let refreshAudit = async function() {};   // exposed for instant refresh
+
+    function startAuditPolling() {
+      if (_auditPollInterval) return;   // Only start once
+      const container = document.getElementById('p2-audit-entries');
+      if (!container) return;
+
+      refreshAudit = async function() {
+        try {
+          const r = await fetch('/audit?limit=5');
+          const data = await r.json();
+          const entries = data.entries || [];
+          if (entries.length === 0) return;
+          container.innerHTML = '';
+          entries.forEach(e => {
+            const outcome = (e.outcome || '').toLowerCase();
+            const cls = ['allow', 'success'].includes(outcome) ? 'p2a-allow'
+                      : ['block', 'denied', 'error'].includes(outcome) ? 'p2a-block'
+                      : 'p2a-warn';
+            const row = document.createElement('div');
+            row.className = 'p2-audit-row ' + cls;
+            const ts = e.timestamp
+              ? new Date(e.timestamp * 1000).toISOString().slice(11, 19)
+              : '';
+            const skillLabel = (e.details && e.details.skill)
+              ? ' ↳ ' + e.details.skill : '';
+            row.innerHTML =
+              '<span class="p2-audit-action">' + (e.action || '') + skillLabel + '</span> ' +
+              '<span class="p2-audit-outcome">' + (e.outcome || '') + '</span> ' +
+              '<span class="p2-audit-ts">' + ts + '</span>';
+            container.appendChild(row);
+          });
+        } catch (_) {}
+      };
+
+      refreshAudit();
+      _auditPollInterval = setInterval(refreshAudit, 3000);
+    }
+
+    // ── WebSocket ──────────────────────────────────────────
+    function connect() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+      ws.onopen = () => {
+        setState('idle');
+        reconnectDelay = 1000;
+        _displaySessionId = 'ws-' + Math.random().toString(36).slice(2, 6);
+        document.getElementById('p2-session-id-val').textContent = _displaySessionId;
+        document.getElementById('p2-session-badge').textContent = 'session: ' + _displaySessionId;
+        p2ConnVal.textContent = 'LIVE';
+        p2ConnVal.classList.add('live');
+      };
+
+      ws.onmessage = (event) => {
+        try   { handleMessage(JSON.parse(event.data)); }
+        catch { appendChunk(event.data); }
+      };
+
+      ws.onclose = () => {
+        statusLabel.textContent = 'OFFLINE';
+        statusLabel.className   = '';
+        p2ConnVal.textContent = 'OFFLINE';
+        p2ConnVal.classList.remove('live');
+        setTimeout(connect, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+      };
+
+      ws.onerror = () => {
+        statusLabel.textContent = 'ERROR';
+        p2ConnVal.textContent = 'ERROR';
+      };
+    }
+
+    function handleMessage(data) {
+      switch (data.type) {
+        case 'ack':
+        case 'response_start':
+          startResponse();
+          break;
+        case 'response_chunk':
+          appendChunk(data.chunk || '');
+          break;
+        case 'response_end':
+          endResponse();
+          break;
+        case 'transcript':
+          showTranscript(data.text || '');
+          startResponse();
+          break;
+        case 'wake':
+          triggerWakeWord();
+          break;
+        case 'status':
+          break;
+        case 'plan': {
+          const pl = document.getElementById('p2-plan-line');
+          if (!pl) break;
+          const steps = (data.steps || []).map(s => s.replace(/_/g, ' ')).join(' → ');
+          pl.innerHTML = '<span class="nova-badge">#AmazonNova</span> Planning: ' + steps;
+          pl.className = 'active';
+          break;
+        }
+        case 'guardian_block': {
+          // 1. Immediately set blocked state — red diamond, coral status text
+          setState('blocked');
+
+          // 2. 300ms red flash over the entire response area
+          p2ResponseContent.style.transition = 'background 0.05s';
+          p2ResponseContent.style.background = 'rgba(255,30,30,0.18)';
+          setTimeout(() => {
+            p2ResponseContent.style.transition = 'background 0.25s';
+            p2ResponseContent.style.background = '';
+          }, 300);
+
+          // 3. Humanise category names for display
+          const _rawCats = (data.categories || []);
+          const _catLabels = {
+            ignore_instructions:  'Prompt injection',
+            email_exfiltration:   'Data exfiltration',
+            pii_request:          'PII request',
+            external_urls:        'External URL',
+            privilege_escalation: 'Privilege escalation',
+            role_override:        'Role override',
+            jailbreak_phrases:    'Jailbreak attempt',
+            data_poisoning:       'Data poisoning',
+            webhook_exfil:        'Webhook exfiltration',
+          };
+          const _cats = _rawCats.map(c => _catLabels[c] || c.replace(/_/g, ' ')).join(' + ');
+          const _score = Math.round((data.risk_score || 0) * 100);
+
+          // 4. Render the block card
+          p2ResponseContent.innerHTML = `
+            <div style="
+              display:flex;flex-direction:column;align-items:center;justify-content:center;
+              min-height:140px;gap:14px;padding:28px 24px;
+              border:1px solid rgba(255,107,107,0.45);border-radius:12px;
+              background:rgba(255,107,107,0.07);backdrop-filter:blur(8px);
+              animation:conflict-enter 0.2s ease;
+            ">
+              <div style="font:700 24px/1 'Inter',sans-serif;color:var(--coral);letter-spacing:3px;">
+                ⚡ BLOCKED BY GUARDIAN
+              </div>
+              <div style="font:500 13px/1.5 'Inter',sans-serif;color:rgba(255,107,107,0.85);text-align:center;">
+                Threat detected: ${_cats || 'Security violation'}
+              </div>
+              <div style="font:500 11px/1 'JetBrains Mono',monospace;color:rgba(255,107,107,0.55);
+                          letter-spacing:1.5px;margin-top:2px;">
+                RISK SCORE: ${_score}%
+              </div>
+            </div>`;
+
+          // 5. Immediate audit panel refresh
+          refreshAudit();
+
+          // 6. Return to idle after 5 s
+          setTimeout(() => setState('idle'), 5000);
+          break;
+        }
+
+        case 'conflict_alert': {
+          // Flash diamond red briefly, then show warning banner
+          const prevState = currentState;
+          setState('blocked');
+          setTimeout(() => setState(prevState === 'blocked' ? 'speaking' : prevState), 1200);
+
+          const banner = document.getElementById('p2-conflict-banner');
+          const detail = document.getElementById('p2-conflict-detail');
+          if (banner && detail) {
+            // Parse the most relevant lines from the preview
+            const raw = (data.preview || '');
+            const lines = raw.split('\n').map(l => l.trim()).filter(l =>
+              l && !l.startsWith('===') && !l.startsWith('Checked') && !l.startsWith('Reference')
+            );
+            detail.textContent = lines.slice(0, 6).join('\n');
+            banner.classList.add('visible');
+            // Scroll banner into view
+            banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+          // Also do a subtle red flash on the response area background
+          p2ResponseContent.style.transition = 'background 0.15s';
+          p2ResponseContent.style.background = 'rgba(255,107,107,0.06)';
+          setTimeout(() => { p2ResponseContent.style.background = ''; }, 1500);
+          break;
+        }
+        case 'tool_status': {
+          const bar = document.getElementById('p2-tool-status-bar');
+          if (!bar) break;
+          const toolKey  = data.tool || '';
+          const toolName = toolKey.replace(/_/g, ' ');
+          const toolId   = 'pill-' + toolKey;
+          const status   = data.status || '';
+          const skillCls = 'skill-' + toolKey;
+          let pill = document.getElementById(toolId);
+          if (!pill) {
+            pill = document.createElement('div');
+            pill.id = toolId;
+            pill.className = 'tool-pill ' + skillCls;
+            bar.appendChild(pill);
+          }
+          if (status === 'running') {
+            pill.className = 'tool-pill running ' + skillCls;
+            pill.textContent = '⟳ ' + toolName;
+          } else {
+            pill.className = 'tool-pill done ' + skillCls;
+            pill.textContent = '✓ ' + toolName;
+          }
+          break;
+        }
+        case 'audio':
+          playAudio(data.data, data.sample_rate || 24000, data.encoding || 'pcm_s16le');
+          break;
+        case 'error':
+          currentText = data.message || 'ERROR';
+          textContent.textContent = currentText;
+          p2ResponseContent.textContent = currentText;
+          responseText.className = 'blocked';
+          respCursor.className = '';
+          setState('blocked');
+          growLineToText();
+          setTimeout(() => setState('idle'), 4000);
+          break;
+        case 'pong':
+          break;
+      }
+    }
+
+    // ── Send message ───────────────────────────────────────
+    function sendMessage() {
+      let text;
+
+      if (activePhase === 2) {
+        text = p2Input.value.trim();
+        if (!text) return;
+        p2Input.value = '';
+        p2Input.style.height = '';
+      } else {
+        text = (expandWrap.classList.contains('active')
+          ? expandInput.value : lineInput.value).trim();
+        if (!text) { closeInline(); closeExpand(); return; }
+      }
+
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+      // Save the user's original typed text before any demo expansion, so the
+      // session log always shows what the user actually wrote, not the internal prompt.
+      const _displayText = text;
+
+      // ── Demo mode trigger ─────────────────────────────
+      if (text.toLowerCase().startsWith('demo:')) {
+        const keyword = text.slice(5).trim().toLowerCase();
+        if (keyword.includes('johnson')) {
+          activeCaseId = 'CASE-001';  // persists for all future sends this session
+          text = 'Prepare me for the Johnson trial. IMPORTANT: You MUST call each tool listed below using the actual tool. '
+               + 'Do NOT write or assume results — call the real tool for each step. '
+               + 'Call ALL 5 tools, one at a time, before writing any summary. '
+               + 'Even if conflict_check returns a conflict warning, IMMEDIATELY call the next tool — do not pause or ask for confirmation. '
+               + 'Step 1: call case_lookup(case_id="CASE-001"). '
+               + 'Step 2: call conflict_check(case_id="CASE-001"). If conflict found, note it and proceed to Step 3 immediately. '
+               + 'Step 3: call calendar(case_id="CASE-001", action="list_events"). '
+               + 'Step 4: call document_search(case_id="CASE-001"). '
+               + 'Step 5: call draft_motion(case_id="CASE-001", motion_type="motion_for_summary_judgment", moving_party="John Smith", opposing_party="Robert Johnson"). '
+               + 'After Step 5 is complete, synthesize all 5 tool results into a trial preparation summary.';
+        }
+      }
+
+      // Use the original typed text in the session log — never the expanded internal prompt.
+      // For demo triggers show a clean label; for all other messages show what was typed.
+      lastUserInput = _displayText.toLowerCase().startsWith('demo:')
+        ? 'Prepare me for the Johnson trial'
+        : _displayText;
+
+      // Clear Phase 1 inputs
+      closeInline(); closeExpand();
+      textContent.textContent = '';
+      currentText = '';
+      responseText.className = '';
+
+      // Clear Phase 2 response area
+      p2ResponseContent.innerHTML = '';
+
+      // Trigger transition on first send
+      if (!phaseTransitioned) transitionToPhase2();
+
+      ws.send(JSON.stringify({
+        type:    'message',
+        text,
+        role:    getRole(),
+        case_id: activeCaseId,
+      }));
+    }
+
+    // ── Phase 2 input events ───────────────────────────────
+    p2Input.addEventListener('input', () => {
+      p2Input.style.height = 'auto';
+      p2Input.style.height = Math.min(p2Input.scrollHeight, 160) + 'px';
+    });
+    p2Input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
+    p2Input.addEventListener('focus', () => {
+      if (currentState === 'idle' || currentState === 'wake') setState('typing');
+    });
+    p2Input.addEventListener('blur', () => {
+      if (currentState === 'typing') setState('idle');
+    });
+
+    document.getElementById('p2-send-btn').onclick = sendMessage;
+    p2MicToggle.onclick = toggleMic;
+    document.getElementById('p2-audit-link').onclick = () => {
+      window.open('/audit?format=html', '_blank');
+    };
+
+    // ── Role select sync ───────────────────────────────────
+    p2RoleSelect.addEventListener('change', (e) => {
+      roleSelect.value = e.target.value;
+      document.getElementById('p2-role-val').textContent = e.target.value.toUpperCase();
+      // Refresh capabilities immediately on role change
+      updateCapabilities(e.target.value);
+    });
+    roleSelect.addEventListener('change', (e) => {
+      p2RoleSelect.value = e.target.value;
+      updateCapabilities(e.target.value);
+    });
+
+    // ── Voice PTT ──────────────────────────────────────────
+    let _mediaRecorder = null;
+    let _audioChunks   = [];
+    let _isRecording   = false;
+    let _micStream     = null;
+    let _micHeld       = false;
+
+    async function startRecording() {
+      if (_isRecording) return;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      try {
+        _micStream = await navigator.mediaDevices.getUserMedia({
+          audio: { channelCount: 1, sampleRate: 44100 }
+        });
+        _audioChunks = [];
+        _mediaRecorder = new MediaRecorder(_micStream);
+        _mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) _audioChunks.push(e.data); };
+        _mediaRecorder.onstop = processAudio;
+        _mediaRecorder.start();
+        _isRecording = true;
+        micToggle.classList.add('active');
+        p2MicToggle.classList.add('active');
+        setState('listening');
+        animateLine(LINE_MIN * 1.5);
+
+        // Transition on first voice too
+        if (!phaseTransitioned) transitionToPhase2();
+      } catch (err) {
+        console.error('Mic access denied:', err);
+      }
+    }
+
+    function stopRecording() {
+      if (!_isRecording || !_mediaRecorder) return;
+      _isRecording = false;
+      _mediaRecorder.stop();
+      if (_micStream) { _micStream.getTracks().forEach(t => t.stop()); _micStream = null; }
+      micToggle.classList.remove('active');
+      p2MicToggle.classList.remove('active');
+    }
+
+    async function processAudio() {
+      if (_audioChunks.length === 0) { setState('idle'); return; }
+      if (currentState === 'listening') setState('speaking');
+      const blob = new Blob(_audioChunks, { type: 'audio/webm' });
+      _audioChunks = [];
+      try {
+        const arrayBuf = await blob.arrayBuffer();
+        const ctx = new AudioContext({ sampleRate: 44100 });
+        const decoded = await ctx.decodeAudioData(arrayBuf);
+        await ctx.close();
+
+        const offCtx = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000);
+        const src = offCtx.createBufferSource();
+        src.buffer = decoded;
+        src.connect(offCtx.destination);
+        src.start(0);
+        const resampled = await offCtx.startRendering();
+
+        const pcm = resampled.getChannelData(0);
+        const int16 = new Int16Array(pcm.length);
+        for (let i = 0; i < pcm.length; i++) {
+          int16[i] = Math.max(-32768, Math.min(32767, Math.round(pcm[i] * 32768)));
+        }
+
+        const wavBuf = buildWav(int16, 16000);
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ type: 'voice_meta', role: getRole(), case_id: 'global' }));
+        ws.send(wavBuf);
+        lastUserInput = '[voice]';
+      } catch (err) {
+        console.error('Audio processing failed:', err);
+        setState('idle');
+      }
+    }
+
+    function buildWav(int16Array, sampleRate) {
+      const numSamples = int16Array.length;
+      const dataSize   = numSamples * 2;
+      const buf  = new ArrayBuffer(44 + dataSize);
+      const view = new DataView(buf);
+      function ws4(off, s) { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); }
+      ws4(0, 'RIFF'); view.setUint32(4, 36 + dataSize, true);
+      ws4(8, 'WAVE'); ws4(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      ws4(36, 'data'); view.setUint32(40, dataSize, true);
+      const pcm = new Int16Array(buf, 44);
+      for (let i = 0; i < numSamples; i++) pcm[i] = int16Array[i];
+      return buf;
+    }
+
+    function toggleMic() {
+      if (_isRecording) stopRecording();
+      else startRecording();
+    }
+
+    // ── Keyboard shortcuts ─────────────────────────────────
+    document.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
+      const tag = document.activeElement ? document.activeElement.tagName : '';
+      const inField = tag === 'INPUT' || tag === 'TEXTAREA';
+
+      if ((e.key === 'm' || e.key === 'M') && !inField) {
+        _micHeld = true;
+        startRecording();
+        return;
+      }
+      if (e.key === ' ' && !inField && !['speaking','listening','wake','typing'].includes(currentState)) {
+        e.preventDefault();
+        if (activePhase === 2) {
+          p2Input.focus();
+          setState('typing');
+        } else {
+          activateInline();
+        }
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      if ((e.key === 'm' || e.key === 'M') && _micHeld) {
+        _micHeld = false;
+        stopRecording();
+      }
+    });
+
+    // ── Init ───────────────────────────────────────────────
+    animateLine(LINE_MIN);
+    connect();
+  </script>
+</body>
+</html>

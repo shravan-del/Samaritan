@@ -1,0 +1,96 @@
+# Samaritan Configuration
+
+# AWS / Bedrock
+aws:
+  region: "us-east-1"
+  # Set credentials via environment variables:
+  #   AWS_ACCESS_KEY_ID
+  #   AWS_SECRET_ACCESS_KEY
+  #   AWS_SESSION_TOKEN (optional)
+
+# Model configuration
+models:
+  chat:
+    model_id: "us.amazon.nova-2-lite-v1:0"
+    max_tokens: 4096
+    temperature: 0.7
+    top_p: 0.9
+  embeddings:
+    model_id: "amazon.titan-embed-text-v2:0"
+  tts:
+    engine: "polly"             # Amazon Polly neural TTS (Nova Sonic requires HTTP/2, unsupported in Python)
+    voice_id: "Joanna"          # Polly neural voices: Joanna, Matthew, Ruth, Stephen
+    sample_rate: 16000          # 16kHz supported by Polly neural engine
+  stt:
+    whisper_model_size: "base"  # tiny | base | small | medium | large
+
+# Voice settings
+voice:
+  sample_rate: 16000
+  silence_threshold: 0.01
+  silence_duration: 1.5       # seconds of silence to stop recording
+  max_record_duration: 30     # max recording seconds
+  wake_words:
+    - "hey samaritan"
+    - "samaritan"
+    - "hey sam"
+  wake_word_model: "tiny"
+
+# Security
+security:
+  guardian:
+    block_threshold: 0.6      # risk score threshold for blocking
+  audit:
+    persist_path: "./audit_log.jsonl"
+    max_memory_entries: 10000
+  sandbox:
+    timeout: 30.0             # skill execution timeout in seconds
+    max_output_chars: 10000
+
+# Memory / Vector store
+memory:
+  backend: "chromadb"         # chromadb | in_memory
+  persist_directory: "./chroma_db"
+  default_n_results: 5
+
+# Agent
+agent:
+  max_react_iterations: 10
+  system_prompt_extra: ""     # Optional extra context appended to system prompt
+
+# Server
+server:
+  host: "0.0.0.0"
+  port: 8001
+  log_level: "info"
+  reload: false
+
+# Session
+session:
+  ttl_seconds: 3600           # session expiry (1 hour)
+
+# Billing defaults
+billing:
+  hourly_rates:
+    attorney: 350.0
+    paralegal: 150.0
+    clinician: 200.0
+    analyst: 175.0
+    reviewer: 125.0
+
+# Skills configuration
+skills:
+  searxng_url: "http://localhost:8080"   # SearXNG instance for web_search skill
+  browser_headless: true
+
+# UI settings
+ui:
+  lan_mode: false           # Set true to bind to 0.0.0.0 with TLS
+  tls_cert: ""              # Path to TLS cert (auto-generated if empty + lan_mode=true)
+  tls_key: ""               # Path to TLS key
+
+# Model routing
+model:
+  multi_model: false        # Set true to enable fast/slow model routing
+  fast_model_id: "us.amazon.nova-lite-v1:0"
+  slow_model_id: "us.amazon.nova-2-lite-v1:0"

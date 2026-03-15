@@ -1,0 +1,99 @@
+# Veritas RBAC Permissions Configuration
+# These override the defaults in security/rbac.py
+
+roles:
+  admin:
+    allowed_skills:
+      - case_lookup
+      - draft_motion
+      - document_search
+      - calendar
+      - billing
+      - web_search
+      - browser
+      - mcp
+      - conflict_check
+    confirmation_required:
+      - draft_motion
+      - billing
+      - mcp
+    memory_namespace: "admin"
+    file_ops: true
+    network_ops: true
+    matter_scoped: false
+    phi_access: false
+    description: "Full system access including MCP and browser automation."
+
+  attorney:
+    allowed_skills:
+      - case_lookup
+      - draft_motion
+      - document_search
+      - calendar
+      - billing
+      - web_search
+      - conflict_check
+    confirmation_required:
+      - draft_motion
+      - billing
+    memory_namespace: "attorney"
+    file_ops: false
+    network_ops: true
+    matter_scoped: true
+    phi_access: false
+    description: "Full access to all legal tools plus web search."
+
+  paralegal:
+    allowed_skills:
+      - case_lookup
+      - document_search
+      - calendar
+      - billing
+      - web_search
+    confirmation_required:
+      - billing
+    memory_namespace: "paralegal"
+    file_ops: false
+    network_ops: true
+    matter_scoped: true
+    phi_access: false
+    description: "Access to case, document, calendar, billing, and web search. No motion drafting."
+
+  clinician:
+    allowed_skills:
+      - case_lookup
+      - document_search
+    confirmation_required: []
+    memory_namespace: "clinician"
+    file_ops: false
+    network_ops: false
+    matter_scoped: true
+    phi_access: true
+    description: "Read-only clinical case access. PHI-aware logging enabled."
+
+  analyst:
+    allowed_skills:
+      - case_lookup
+      - document_search
+      - billing
+      - web_search
+    confirmation_required:
+      - billing
+    memory_namespace: "analyst"
+    file_ops: false
+    network_ops: true
+    matter_scoped: false
+    phi_access: false
+    description: "Analytics, case lookup, billing review, and web search access."
+
+  reviewer:
+    allowed_skills:
+      - case_lookup
+      - document_search
+    confirmation_required: []
+    memory_namespace: "reviewer"
+    file_ops: false
+    network_ops: false
+    matter_scoped: true
+    phi_access: false
+    description: "Read-only review access to cases and documents."

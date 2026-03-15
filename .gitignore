@@ -1,0 +1,25 @@
+# Runtime data — regenerates automatically, not part of source
+audit_log.jsonl
+chroma_db/
+chroma_db_test/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment & secrets
+.env
+.env.*
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# macOS
+.DS_Store
+
+# Claude Code local config (dev-only, not part of submission)
+.claude/
