@@ -1109,6 +1109,18 @@
       margin-right: 4px;
     }
 
+    /* Live demo banner — small cyan text at top of response area */
+    #p2-live-banner {
+      font: 600 9px/1 'JetBrains Mono', monospace;
+      letter-spacing: 2px;
+      color: var(--cyan);
+      text-align: center;
+      padding: 6px 0 4px;
+      opacity: 0.7;
+      text-shadow: 0 0 8px var(--cyan-glow);
+      pointer-events: none;
+    }
+
     /* ── CONFLICT WARNING BANNER ─────────────────── */
     #p2-conflict-banner {
       display: none;
@@ -1312,6 +1324,7 @@
       <!-- CENTER: Response + Input -->
       <div id="p2-main">
         <div id="p2-response-area">
+          <div id="p2-live-banner">LIVE DEMO — Powered by Amazon Nova 2 Lite on AWS Bedrock</div>
           <div id="p2-transcript-bubble"></div>
           <div id="p2-plan-line"></div>
           <div id="p2-tool-status-bar"></div>
