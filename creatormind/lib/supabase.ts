@@ -1,30 +1,37 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createServerClient as createSSRServerClient, type CookieOptions } from '@supabase/ssr'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-
 // Client-side Supabase client (uses anon key)
 // Uses || '' fallback so the module loads at build time without crashing;
 // real values are always present at runtime via NEXT_PUBLIC_ env vars.
-export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createSupabaseClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder'
+)
 
 // Server-side admin client (bypasses RLS — only for cron/webhook)
+// Reads env vars at call time (runtime) not module load time (build time)
 export function supabaseAdmin() {
-  return createSupabaseClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  )
 }
 
 // Route handler client that reads auth session from cookies
 export async function createServerClient() {
   const { cookies } = await import('next/headers')
   const cookieStore = await cookies()
-  return createSSRServerClient(supabaseUrl, supabaseAnonKey, {
+  return createSSRServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
     cookies: {
       get(name: string) {
         return cookieStore.get(name)?.value

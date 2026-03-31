@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { NextResponse } from 'next/server'
 import { createServerClient, supabaseAdmin } from '@/lib/supabase'
 import { generateWeeklyBrief } from '@/lib/anthropic'
