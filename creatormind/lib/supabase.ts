@@ -1,12 +1,24 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createServerClient as createSSRServerClient, type CookieOptions } from '@supabase/ssr'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
 // Client-side Supabase client (uses anon key)
-export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey)
+// Lazily created so missing env vars during build don't crash the module
+let _supabase: ReturnType<typeof createSupabaseClient> | null = null
+export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>, {
+  get(_target, prop) {
+    if (!_supabase) {
+      _supabase = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+    }
+    return (_supabase as Record<string | symbol, unknown>)[prop]
+  },
+})
 
 // Server-side admin client (bypasses RLS — only for cron/webhook)
 export function supabaseAdmin() {
